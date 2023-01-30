@@ -1,0 +1,450 @@
+--------------------------------------------------------------------------------------------------------------------------------------------------
+      name:  <unnamed>
+       log:  C:\Users\sean\Desktop\lshtm\stat_comp\stata\scratch.log
+  log type:  text
+ opened on:   8 Oct 2022, 20:43:04
+
+. 
+. ls "../data/*.dta" // list all the .dta files in the data folder
+ 500.3k   9/29/22  9:40  bl_combined.dta   
+ 502.7k   9/29/22  9:40  bl_combined1.dta  
+ 706.9k   9/29/22  9:40  bl_combined2.dta  
+ 251.1k   9/29/22  9:40  bl_demog.dta      
+ 111.0k   9/29/22  9:40  bl_labsall.dta    
+ 753.2k   9/29/22  9:40  bl_meds.dta       
+ 433.5k   9/29/22  9:40  fup_anthrop.dta   
+ 398.0k   9/29/22  9:40  fup_hrate.dta     
+1052.3k   9/29/22  9:40  fup_meds.dta      
+ 441.8k   9/29/22  9:40  fup_pot_long.dta  
+ 687.1k   9/29/22  9:40  fup_pot_long1.dta 
+ 492.1k   9/29/22  9:40  fup_sbp.dta       
+   3.5k   9/29/22  9:40  meanpot.dta       
+1696.1k   9/29/22  9:40  vitals_long.dta   
+
+. sysuse auto.dta // "use" puts a dataset in memory, auto comes bundled in "sys"
+(1978 automobile data)
+
+. 
+. *** Looking at data - all of these work with varlists (see codebook ex below)
+. describe
+
+Contains data from C:\Program Files\Stata17\ado\base/a/auto.dta
+ Observations:            74                  1978 automobile data
+    Variables:            12                  13 Apr 2020 17:45
+                                              (_dta has notes)
+--------------------------------------------------------------------------------------------------------------------------------------------------
+Variable      Storage   Display    Value
+    name         type    format    label      Variable label
+--------------------------------------------------------------------------------------------------------------------------------------------------
+make            str18   %-18s                 Make and model
+price           int     %8.0gc                Price
+mpg             int     %8.0g                 Mileage (mpg)
+rep78           int     %8.0g                 Repair record 1978
+headroom        float   %6.1f                 Headroom (in.)
+trunk           int     %8.0g                 Trunk space (cu. ft.)
+weight          int     %8.0gc                Weight (lbs.)
+length          int     %8.0g                 Length (in.)
+turn            int     %8.0g                 Turn circle (ft.)
+displacement    int     %8.0g                 Displacement (cu. in.)
+gear_ratio      float   %6.2f                 Gear ratio
+foreign         byte    %8.0g      origin     Car origin
+--------------------------------------------------------------------------------------------------------------------------------------------------
+Sorted by: foreign
+
+. browse
+
+. summarize // Obs is the number of NUMERIC observations (so no strings or NA)
+
+    Variable |        Obs        Mean    Std. dev.       Min        Max
+-------------+---------------------------------------------------------
+        make |          0
+       price |         74    6165.257    2949.496       3291      15906
+         mpg |         74     21.2973    5.785503         12         41
+       rep78 |         69    3.405797    .9899323          1          5
+    headroom |         74    2.993243    .8459948        1.5          5
+-------------+---------------------------------------------------------
+       trunk |         74    13.75676    4.277404          5         23
+      weight |         74    3019.459    777.1936       1760       4840
+      length |         74    187.9324    22.26634        142        233
+        turn |         74    39.64865    4.399354         31         51
+displacement |         74    197.2973    91.83722         79        425
+-------------+---------------------------------------------------------
+  gear_ratio |         74    3.014865    .4562871       2.19       3.89
+     foreign |         74    .2972973    .4601885          0          1
+
+. codebook make price rep78 foreign // varlist = list of columns after command
+
+--------------------------------------------------------------------------------------------------------------------------------------------------
+make                                                                                                                                Make and model
+--------------------------------------------------------------------------------------------------------------------------------------------------
+
+                  Type: String (str18), but longest is str17
+
+         Unique values: 74                        Missing "": 0/74
+
+              Examples: "Cad. Deville"
+                        "Dodge Magnum"
+                        "Merc. XR-7"
+                        "Pont. Catalina"
+
+               Warning: Variable has embedded blanks.
+
+--------------------------------------------------------------------------------------------------------------------------------------------------
+price                                                                                                                                        Price
+--------------------------------------------------------------------------------------------------------------------------------------------------
+
+                  Type: Numeric (int)
+
+                 Range: [3291,15906]                  Units: 1
+         Unique values: 74                        Missing .: 0/74
+
+                  Mean: 6165.26
+             Std. dev.:  2949.5
+
+           Percentiles:     10%       25%       50%       75%       90%
+                           3895      4195    5006.5      6342     11385
+
+--------------------------------------------------------------------------------------------------------------------------------------------------
+rep78                                                                                                                           Repair record 1978
+--------------------------------------------------------------------------------------------------------------------------------------------------
+
+                  Type: Numeric (int)
+
+                 Range: [1,5]                         Units: 1
+         Unique values: 5                         Missing .: 5/74
+
+            Tabulation: Freq.  Value
+                            2  1
+                            8  2
+                           30  3
+                           18  4
+                           11  5
+                            5  .
+
+--------------------------------------------------------------------------------------------------------------------------------------------------
+foreign                                                                                                                                 Car origin
+--------------------------------------------------------------------------------------------------------------------------------------------------
+
+                  Type: Numeric (byte)
+                 Label: origin
+
+                 Range: [0,1]                         Units: 1
+         Unique values: 2                         Missing .: 0/74
+
+            Tabulation: Freq.   Numeric  Label
+                           52         0  Domestic
+                           22         1  Foreign
+
+. 
+. * In the browser the foreign col was blue, thats because its coded (so not str)
+. 
+. * Looking at the help for browse, you can put an if after to filter:
+. help browse
+
+. browse if missing(rep78)
+
+. 
+. * Or if you dont want to browse, use list to find the values for a specific col:
+. list make if missing(rep78) // Get the values of make with missing rep78
+
+     +---------------+
+     | make          |
+     |---------------|
+  3. | AMC Spirit    |
+  7. | Buick Opel    |
+ 45. | Plym. Sapporo |
+ 51. | Pont. Phoenix |
+ 64. | Peugeot 604   |
+     +---------------+
+
+. ********************************************************************************
+. 
+. *** Descriptives
+. summarize price, detail // Anything after , is optional. this one gets more info
+
+                            Price
+-------------------------------------------------------------
+      Percentiles      Smallest
+ 1%         3291           3291
+ 5%         3748           3299
+10%         3895           3667       Obs                  74
+25%         4195           3748       Sum of wgt.          74
+
+50%       5006.5                      Mean           6165.257
+                        Largest       Std. dev.      2949.496
+75%         6342          13466
+90%        11385          13594       Variance        8699526
+95%        13466          14500       Skewness       1.653434
+99%        15906          15906       Kurtosis       4.819188
+
+. browse if price > 13000
+
+. 
+. * One way tables - one way (percentages) or two way (interactions):
+. tabulate foreign
+
+ Car origin |      Freq.     Percent        Cum.
+------------+-----------------------------------
+   Domestic |         52       70.27       70.27
+    Foreign |         22       29.73      100.00
+------------+-----------------------------------
+      Total |         74      100.00
+
+. tabulate rep78
+
+     Repair |
+record 1978 |      Freq.     Percent        Cum.
+------------+-----------------------------------
+          1 |          2        2.90        2.90
+          2 |          8       11.59       14.49
+          3 |         30       43.48       57.97
+          4 |         18       26.09       84.06
+          5 |         11       15.94      100.00
+------------+-----------------------------------
+      Total |         69      100.00
+
+. tabulate rep78 foreign, row // two way! ,row adds in row percentages
+
++----------------+
+| Key            |
+|----------------|
+|   frequency    |
+| row percentage |
++----------------+
+
+    Repair |
+    record |      Car origin
+      1978 |  Domestic    Foreign |     Total
+-----------+----------------------+----------
+         1 |         2          0 |         2 
+           |    100.00       0.00 |    100.00 
+-----------+----------------------+----------
+         2 |         8          0 |         8 
+           |    100.00       0.00 |    100.00 
+-----------+----------------------+----------
+         3 |        27          3 |        30 
+           |     90.00      10.00 |    100.00 
+-----------+----------------------+----------
+         4 |         9          9 |        18 
+           |     50.00      50.00 |    100.00 
+-----------+----------------------+----------
+         5 |         2          9 |        11 
+           |     18.18      81.82 |    100.00 
+-----------+----------------------+----------
+     Total |        48         21 |        69 
+           |     69.57      30.43 |    100.00 
+
+. 
+. * Grouped summaries can be done by hand if you want:
+. summarize mpg if foreign == 0
+
+    Variable |        Obs        Mean    Std. dev.       Min        Max
+-------------+---------------------------------------------------------
+         mpg |         52    19.82692    4.743297         12         34
+
+. summarize mpg if foreign == 1
+
+    Variable |        Obs        Mean    Std. dev.       Min        Max
+-------------+---------------------------------------------------------
+         mpg |         22    24.77273    6.611187         14         41
+
+. 
+. * But its easier to use by, which is a PREFIX command. The main thing about
+. * prefix commands is they basically 2 commands (each with their own ,),
+. * separated by a :
+. by foreign : summarize mpg // syntax: by varlist [,] : <command [,]>
+
+--------------------------------------------------------------------------------------------------------------------------------------------------
+-> foreign = Domestic
+
+    Variable |        Obs        Mean    Std. dev.       Min        Max
+-------------+---------------------------------------------------------
+         mpg |         52    19.82692    4.743297         12         34
+
+--------------------------------------------------------------------------------------------------------------------------------------------------
+-> foreign = Foreign
+
+    Variable |        Obs        Mean    Std. dev.       Min        Max
+-------------+---------------------------------------------------------
+         mpg |         22    24.77273    6.611187         14         41
+
+
+. * by runs the code after : for each subgroups of the data before the :
+. 
+. * Looking at help tabulate, there's a 3rd option - tabulate followed by a
+. * summarize will produce tables with a summary of each combination group
+. tabulate foreign, summarize(mpg)
+
+            |      Summary of Mileage (mpg)
+ Car origin |        Mean   Std. dev.       Freq.
+------------+------------------------------------
+   Domestic |   19.826923   4.7432972          52
+    Foreign |   24.772727   6.6111869          22
+------------+------------------------------------
+      Total |   21.297297   5.7855032          74
+
+. 
+. * Hypothesis test - just do t as an example, others similar
+. ttest mpg, by(foreign) // NOT the same by as the prefix, this one is an option
+
+Two-sample t test with equal variances
+------------------------------------------------------------------------------
+   Group |     Obs        Mean    Std. err.   Std. dev.   [95% conf. interval]
+---------+--------------------------------------------------------------------
+Domestic |      52    19.82692     .657777    4.743297    18.50638    21.14747
+ Foreign |      22    24.77273     1.40951    6.611187    21.84149    27.70396
+---------+--------------------------------------------------------------------
+Combined |      74     21.2973    .6725511    5.785503     19.9569    22.63769
+---------+--------------------------------------------------------------------
+    diff |           -4.945804    1.362162               -7.661225   -2.230384
+------------------------------------------------------------------------------
+    diff = mean(Domestic) - mean(Foreign)                         t =  -3.6308
+H0: diff = 0                                     Degrees of freedom =       72
+
+    Ha: diff < 0                 Ha: diff != 0                 Ha: diff > 0
+ Pr(T < t) = 0.0003         Pr(|T| > |t|) = 0.0005          Pr(T > t) = 0.9997
+
+. 
+. * Correlation matrices
+. correlate mpg weight
+(obs=74)
+
+             |      mpg   weight
+-------------+------------------
+         mpg |   1.0000
+      weight |  -0.8072   1.0000
+
+
+. by foreign : correlate mpg weight
+
+--------------------------------------------------------------------------------------------------------------------------------------------------
+-> foreign = Domestic
+(obs=52)
+
+             |      mpg   weight
+-------------+------------------
+         mpg |   1.0000
+      weight |  -0.8759   1.0000
+
+
+--------------------------------------------------------------------------------------------------------------------------------------------------
+-> foreign = Foreign
+(obs=22)
+
+             |      mpg   weight
+-------------+------------------
+         mpg |   1.0000
+      weight |  -0.6829   1.0000
+
+
+
+. correlate mpg weight length turn displacement
+(obs=74)
+
+             |      mpg   weight   length     turn displa~t
+-------------+---------------------------------------------
+         mpg |   1.0000
+      weight |  -0.8072   1.0000
+      length |  -0.7958   0.9460   1.0000
+        turn |  -0.7192   0.8574   0.8643   1.0000
+displacement |  -0.7056   0.8949   0.8351   0.7768   1.0000
+
+
+. ********************************************************************************
+. 
+. *** Graphs
+. 
+. * Plotting two things at once are called "twoway"s in stata
+. * By default stata will use the variables Label to label the axes
+. twoway scatter mpg weight // Make a scatter plot of mpg (x) and weight (y)
+
+. 
+. * It's a good idea to put the plot command in (), lets you get more complex:
+. twoway (scatter mpg weight), by(foreign, total) // total adds a total chart
+
+. ********************************************************************************
+. 
+. *** Regression (and more graphs)
+. * Model: mpg ~ weight + weight^2 + I[foreign]
+. * Need to make the weight^2 term first, then do the regression
+. gen wtsq = weight^2 // This will get added to the data loaded in memory
+
+. regress mpg weight wtsq foreign
+
+      Source |       SS           df       MS      Number of obs   =        74
+-------------+----------------------------------   F(3, 70)        =     52.25
+       Model |  1689.15372         3   563.05124   Prob > F        =    0.0000
+    Residual |   754.30574        70  10.7757963   R-squared       =    0.6913
+-------------+----------------------------------   Adj R-squared   =    0.6781
+       Total |  2443.45946        73  33.4720474   Root MSE        =    3.2827
+
+------------------------------------------------------------------------------
+         mpg | Coefficient  Std. err.      t    P>|t|     [95% conf. interval]
+-------------+----------------------------------------------------------------
+      weight |  -.0165729   .0039692    -4.18   0.000    -.0244892   -.0086567
+        wtsq |   1.59e-06   6.25e-07     2.55   0.013     3.45e-07    2.84e-06
+     foreign |    -2.2035   1.059246    -2.08   0.041      -4.3161   -.0909002
+       _cons |   56.53884   6.197383     9.12   0.000     44.17855    68.89913
+------------------------------------------------------------------------------
+
+. 
+. * Now add predictions into the dataset - predict does the work, you just need to
+. * give the name of the new predicted variable (mpghat for this example)
+. predict mpghat
+(option xb assumed; fitted values)
+
+. 
+. * Plot it
+. twoway (scatter mpg weight) (line mpghat weight, sort), by(foreign)
+
+. 
+. * Feels a bit weird that its quadratic - shouldnt mpg vs weight be linear?
+. * The amount of energy needed to move 2 tons should be double the amount needed 
+. * to move 1 ton
+. generate energy_efficiency = 100/mpg
+
+. twoway scatter energy_efficiency weight, by(foreign, total)
+
+. 
+. * The y axis looks daft because there's no label, so make one and replot
+. label variable energy_efficiency "Gallons per 100 miles"
+
+. twoway scatter energy_efficiency weight, by(foreign, total) 
+
+. 
+. * Looks like a very linear relationship, so try another regression (no sq term!)
+. regress energy_efficiency weight foreign
+
+      Source |       SS           df       MS      Number of obs   =        74
+-------------+----------------------------------   F(2, 71)        =    113.97
+       Model |  91.1761694         2  45.5880847   Prob > F        =    0.0000
+    Residual |  28.4000913        71  .400001287   R-squared       =    0.7625
+-------------+----------------------------------   Adj R-squared   =    0.7558
+       Total |  119.576261        73  1.63803097   Root MSE        =    .63246
+
+------------------------------------------------------------------------------
+energy_eff~y | Coefficient  Std. err.      t    P>|t|     [95% conf. interval]
+-------------+----------------------------------------------------------------
+      weight |   .0016254   .0001183    13.74   0.000     .0013896    .0018612
+     foreign |   .6220535   .1997381     3.11   0.003     .2237871     1.02032
+       _cons |  -.0734839   .4019932    -0.18   0.855    -.8750354    .7280677
+------------------------------------------------------------------------------
+
+. 
+. * So foreign cars arent more efficient, its just that they're lighter so they
+. * seemed to be more efficient in the summary stats
+. 
+. * Recreate the regression line plot with this new model:
+. predict energy_eff_hat
+(option xb assumed; fitted values)
+
+. twoway (scatter energy_efficiency weight) (line energy_eff_hat weight, sort), by(foreign)
+
+. 
+. * Close the log file you opened at the start
+. log close
+      name:  <unnamed>
+       log:  C:\Users\sean\Desktop\lshtm\stat_comp\stata\scratch.log
+  log type:  text
+ closed on:   8 Oct 2022, 20:43:14
+--------------------------------------------------------------------------------------------------------------------------------------------------

@@ -1,0 +1,281 @@
+---
+format: 
+  pdf: 
+    geometry:
+      - top=20mm
+      - left=15mm
+      - right=15mm
+      - bottom=20mm
+      - heightrounded
+---
+
+```{r setup, echo=F, message=F, include=F, warning=F}
+library(ggplot2)
+library(flextable)
+library(dplyr)
+library(tidyr)
+```
+
+# Question 1
+
+## Part a
+The probability tree for outcomes after 1 year is below - probabilities are given next to the arrows, and the final (joint) probabilities are underlined at the end of the diagram:
+```{dot, eval=F}
+digraph{
+  rankdir = LR
+  
+  node [shape = box] # Outcomes
+  "Treatment\ntype"; "New\ntreatment"; "Standard\ntreatment"; 
+  "Alive"; "Dead"; "Alive "; "Dead "; 
+  
+  node [shape = underline] # Probabilities
+  "0.45"; "0.05"; "0.15"; "0.35";
+  
+  # Edges
+  "Treatment\ntype" -> "New\ntreatment" [label = 0.5];
+  "Treatment\ntype" -> "Standard\ntreatment" [label = 0.5];
+  "New\ntreatment" -> "Alive" [label = 0.9];
+  "New\ntreatment" -> "Dead" [label = 0.1];
+  "Standard\ntreatment" -> "Alive " [label = 0.7];
+  "Standard\ntreatment" -> "Dead " [label = 0.3];
+  "Alive" -> "0.45"; 
+  "Dead" -> "0.05";
+  "Alive " -> "0.35";
+  "Dead " -> "0.15";
+  
+  graph [nodesep = 0.7]
+}
+```
+
+## Part b
+From the tree & using the definition of conditional probability:
+
+$$
+P(\text{New} \vert \text{Survive}) = \frac{P(\text{New, Survive})}{P(\text{Survive})} = \frac{0.45}{0.45 + 0.35} = 0.56
+$$
+
+# Question 2
+
+Let $X = \text{Number of patients in A+E during Saturday peak requiring immediate attention}$. The text says $X \sim Pois(\mu = 3)$, and patients are sent to another hospital if $X > 4$.
+
+## Part a
+$$
+\begin{aligned}
+P(\text{Send patients to other hospital}) &= P(X > 4) \\
+                                          &= 1- P(X \leq 3) \\
+                                          &= 1 - (.0498 + .1494 + .2240 + .2240) \quad\quad \text{[From Neave]} \\
+                                          &= 0.3528
+\end{aligned}
+$$
+## Part b
+We want to find $x$ such that $P(X \leq x)  = 0.95$. Looking at the cumulative Poisson chart on pg 17 of Neave gives $x = 6$.
+
+## Part c
+For a Poisson, $EX = \mu$, so the expected number of patients is $3$.
+
+## Part d
+For a Poisson, the most probable value is $\mu$, so the most probable number of patients arriving each Saturday is 3.
+
+## Part e
+The main assumptions are:
+
+* The arrival rate $\mu$ is constant over the period of interest
+* No patients arrive at the exact same time
+* The number of patients in A&E is independent - the number of patients at 6pm (say) has no impact on the number of patients at 7pm
+* The number of patients in A&E at any time is a positive integer - $0, 1, 2, \dots$
+
+# Question 3
+Let $X = \text{Number of patients who prefer drug A}$. The text says each of the 10 patients can only pick one of two drugs, so $X \sim Binom(10, p)$ where $p = P(\text{Patient prefers drug A})$.
+
+## Part a
+Since both drugs have the same effectiveness, $p = 0.5$.
+
+## Part b
+There are $\binom{10}{k}$ ways for $k$ patients to prefer drug A ($0 \leq k \leq 10$). As a table:
+
+\begin{table}[H]
+\centering
+\begin{tabular}{|cr|}
+\hline
+\multicolumn{1}{|c}{\begin{tabular}[c]{@{}c@{}}Number of patients preferring \\ drug A\end{tabular}} & \multicolumn{1}{c|}{Number of possible ways} \\ \hline
+0  & 1   \\
+1  & 10  \\
+2  & 45  \\
+3  & 120 \\
+4  & 210 \\
+5  & 252 \\
+6  & 210 \\
+7  & 120 \\
+8  & 45  \\
+9  & 10  \\
+10 & 1   \\ \hline
+\end{tabular}
+\caption{Number of ways for $k$ patients to prefer drug A}
+\label{tab:binom}
+\end{table}
+
+## Part c
+If the drugs are equally effective, then $X \sim Binom(10, 0.5)$. The probability of 8 patients preferring drug A is:
+
+$$
+P(X = 8) = \binom{10}{8} 0.5^8(1-0.5)^2 = 0.0439
+$$
+
+For 8 or more preferring A:
+
+$$
+\begin{aligned} 
+P(X \geq 8) &= P(X = 8) + P(X = 9) + P(X = 10) \\
+            &= 0.5^{10}\left[ \binom{10}{8} + \binom{10}{9} + \binom{10}{10} \right] \\
+            &= 0.0547
+\end{aligned}
+$$
+
+
+## Part d
+The general formula for a binomial with $n$ trials & probability of success $p$ is: 
+
+$$
+P(X = x) = \binom{n}{x}p^x(1-p)^{n-x}
+$$
+
+In our example, $n = 10$ and $p = 1-p = 0.5$, so the probabilities have the form:
+
+$$
+P(X = x) = \binom{10}{x}0.5^{10}
+$$
+
+The first term is in the table from part b.  
+  You can get probabilities for questions like 'whats the probability Y people prefer drug A' by multiplying the coefficient in row Y of the table by $0.5^{10}$. Since the events in the table are independent, you can get probabilities for questions like 'whats the probability that Y or more patients prefer drug A' by summing the rows with $X \geq Y$ and multiplying by $0.5^{10}$.
+
+## Part e
+The probability of $X$ people preferring drug A is the same as the probability of $X$ people preferring drug B (since $p = 0.5$), so the conclusion is that drugs A & B are equally effective at pain management - at least for the 10 patients in the study. There is a lot of uncertainty around this statement however, because the number of patients in the study is small.
+
+## Part f
+The main assumptions are:
+
+* The events are independent - if patient i says they prefer drug A, that should have no influence on which drug patient j prefers
+* Each patient has the same probability $p$ of preferring drug A
+* Each patient has the same set of 2 options - it's not possible for patient k to say that they preferred neither drug for example
+
+The study says the patients are asked which of the 2 drugs they prefer, so the last assumption is met.  
+  Independence feels like a reasonable assumption, but it would depend on how the question is asked. If all the patients are in the same room and asked which drug they prefer at the same time, then that may affect peoples answers (e.g. if the first 4 people said they prefer drug A, patient 5 might feel pressured to also say they prefer drug A). There's no info on how the study asked the question, so we can't look at that in any more detail.  
+  The assumption about the probabilities being the same for each patient also feels reasonable. There may have been an interaction between the drugs - maybe drug B is more effective if it's taken after drug A for example - but the wash out period mentioned in the study should give time for the drugs to leave the patients system before they are given the second drug.
+  
+# Question 4
+
+## Part a
+For the WHO protocol, a positive person will get a positive test if they test positive on the first test, and if they test positive on follow up test 1, or follow up test 2, or both follow up tests. A negative person will test negative if they test negative on the first test, or if they test positive on the first test and negative on both follow ups. A single test has sensitivity $\alpha$ and specificity $\beta$, so the WHO protocol has:
+
+$$
+\begin{aligned}
+\text{Sensitivity} &= \alpha[\alpha(1-\alpha) + (1-\alpha)\alpha + \alpha^2] \\
+                   &= \alpha^2(2 - \alpha) \\ \\
+\text{Specificity} &= \beta + (1-\beta)\beta^2 \\
+                   &= \beta(1 + \beta - \beta^2)
+\end{aligned}
+$$
+
+## Part b
+
+Since $0 \leq \alpha, \beta \leq 1$, we know that $\alpha^2 \leq \alpha$ and $\beta^2 \leq \beta$. Also $2 - \alpha \geq 1$ and $1 + \beta - \beta^2 \geq 1$. This means that \underline{the WHO protocol has lower (or equal) sensitivity} and \underline{higher (or equal) specificity} than the single test. The WHO protocol will have the same sensitivity & specificity only if the sensitivity & specificity of the single test are both 1 or both 0. The drop in sensitivity is very small if the single test has high sensitivity (0.9 or higher).
+
+```{r, echo=F, warning=F, message=F}
+who_sens = function(x) x^2*(2-x)
+who_spec = function(x) x*(1+x-x^2)
+
+x = seq(0, 1, length.out = 100)
+sens = who_sens(x)
+spec = who_spec(x)
+
+df = data.frame(x = rep(x, 2), y = c(sens, spec), 
+                what = rep(c('Sensitivity', 'Specificity'), each = 100))
+
+plt = ggplot(df, aes(x = x, y = y, colour = what)) +
+  geom_abline(intercept = 0, slope = 1, lty = 2) +
+  geom_line(show.legend = F, size = 1) +
+  facet_wrap(~what, nrow = 1) +
+  coord_cartesian(expand = F)
+```
+
+A test with sensitivity $\theta$ and specificity $\gamma$, done in a region with disease prevalence $p$, has a positive predictive value of:
+
+$$
+\begin{aligned}
+\text{ppv} &= P(\text{Disease} \vert \text{Positive}) \\
+           &= \frac{P(\text{Positive} \vert \text{Disease}) P(\text{Disease})}{P(\text{Positive})} \\
+           &= \frac{\theta p}{\theta p + (1-\gamma)(1-p)}
+\end{aligned}
+$$
+
+The table below shows the positive predictive values for the single test & WHO protocol. The table looks at performance of a poor test ($\alpha=0.6, \beta=0.6$), an OK test ($\alpha=0.8, \beta=0.75$), and a good test ($\alpha=0.9, \beta=0.8$). \underline{The WHO protocol has higher positive predictive values in all settings}:
+
+```{r, echo=F, warning=F, message=F}
+ppv = function(sens, spec, prev) round(sens * prev / (sens * prev + (1 - spec) * (1 - prev)),2)
+
+prevs = data.frame(id = 1:3, prev = c(.02, .1, .25), 
+                   prev_lab = c('Low prevalence (2%)', 
+                                'Medium prevalence (10%)',
+                                'High prevalence (25%)'))
+tests = data.frame(id = 1:3, sens = c(.6, .8, .9), spec = c(.6, .75, .8),
+                   test_lab = c('Poor','OK','Good'))
+
+lab_prevs = c('Low prevalence (2%)', 'Medium prevalence (10%)', 'High prevalanece (25%)')
+test_types = c('Poor', 'OK', 'Good')
+
+combos = expand_grid(id1 = 1:3, id2 = 1:3) %>%
+  left_join(prevs, by = c('id1' = 'id')) %>%
+  left_join(tests, by = c('id2' = 'id')) %>%
+  mutate(ppv_single = ppv(sens, spec, prev),
+         ppv_who = ppv(who_sens(sens), who_spec(spec), prev)) %>%
+  select(prev_lab, test_lab, contains('ppv')) %>%
+  pivot_wider(names_from = 'test_lab', 
+              values_from = c('ppv_single', 'ppv_who')) %>%
+  select(prev_lab, contains('Poor'), contains('OK'), contains('Good'))
+
+ft = flextable(combos) %>%
+  delete_part() %>%
+  add_header_row(values = c('', 
+                            'sens = 0.6, spec = 0.6', 
+                            'sens = 0.8, spec = 0.75', 
+                            'sens = 0.9, spec = 0.8'),
+                 colwidths = c(1, 2, 2, 2)) %>%
+  add_header_row(values = c('Prevalence', rep(c('Single', 'WHO'), 3)), top = F) %>%
+  theme_booktabs() %>%
+  align(align = 'center', part = 'all') %>%
+  vline(j = c(1, 3, 5)) %>%
+  set_table_properties(layout = 'autofit', width = 1)
+```
+
+\begin{table}[H]
+\centering
+\begin{tabular}{|l|cc|cc|cc|}
+\hline
+ &
+  \multicolumn{2}{c|}{\begin{tabular}[c]{@{}c@{}}Poor test\\ (sens=0.6, spec=0.6)\end{tabular}} &
+  \multicolumn{2}{c|}{\begin{tabular}[c]{@{}c@{}}OK test\\ (sens=0.8, spec=0.75)\end{tabular}} &
+  \multicolumn{2}{c|}{\begin{tabular}[c]{@{}c@{}}Good test\\ (sens=0.9, spec=0.8)\end{tabular}} \\ \hline
+Prevalence    & \textit{Single} & \textit{WHO} & \textit{Single} & \textit{WHO} & \textit{Single} & \textit{WHO} \\ \hline
+Low (2\%)     & 0.03            & 0.04         & 0.06            & 0.13         & 0.08            & 0.20         \\
+Medium (10\%) & 0.14            & 0.18         & 0.26            & 0.44         & 0.33            & 0.58         \\
+High (25\%)   & 0.33            & 0.40         & 0.52            & 0.70         & 0.60            & 0.80         \\ \hline
+\end{tabular}
+\caption{Positive predictive values for a single test \& the WHO protocol}
+\label{tab:ppv}
+\end{table}
+
+## Part c
+Advantages:
+
+* Since the WHO protocol has a higher positive predictive value than the single test, it is better at correctly identifying people who have HIV. This is useful because people with HIV can modify their behaviour to reduce onward transmission, and HIV can be treated to prevent progression to AIDS. The WHO protocol will be better than a single test at reducing new cases of HIV and AIDS, provided other public health measures (help around behaviour change, access to HIV drugs etc) are available
+* The WHO protocol is better at correctly identifying people with HIV in low prevalence settings, making the protocol better at HIV surveillance compared to the single test. The WHO protocol will more rapidly identify new cases which may be missed with a single test, which will be helpful for quickly identifying new cases / clusters / outbreaks for further investigation
+* A high specificity lowers the chances of a false positive. Depending on the methods of the surveillance study, we may end up testing a large number of people, so the WHO protocol would find fewer false positives compared to a single test. This will reduce the negative impacts of being incorrectly diagnosed with HIV (stress and unnecessary treatment for example) 
+
+\newpage
+Disadvantages:
+
+* Repeated testing takes longer, and uses more tests than just doing a single test. If the test takes a long time or is unpleasant / invasive, the repeat testing may make people less willing to be tested
+* Training people to test using the WHO protocol will take longer compared to training people to use a single test, and may introduce some time lags at the start of the study
+
+## Part d
+The main assumption is that the test results are independent of each other. This is reasonable, but would depend on who is doing the test. For example if the test is being done by people who are properly trained then each test result will be independent, but if the test is being done by an untrained person there is a chance of tests being contaminated (e.g. samples not properly separated) which may remove independence.

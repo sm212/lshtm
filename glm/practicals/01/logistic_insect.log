@@ -1,0 +1,90 @@
+-------------------------------------------------------------------------------------------
+      name:  <unnamed>
+       log:  C:\Users\sean\Desktop\lshtm\glm\practicals\01\logistic_insect.log
+  log type:  text
+ opened on:  16 Jan 2023, 09:37:44
+
+. clear
+
+. use "insect.dta"
+
+. glm r dose, family(binomial n) link(logit)
+
+Iteration 0:   log likelihood = -16.707577  
+Iteration 1:   log likelihood =  -16.69699  
+Iteration 2:   log likelihood = -16.696989  
+
+Generalized linear models                         Number of obs   =          8
+Optimization     : ML                             Residual df     =          6
+                                                  Scale parameter =          1
+Deviance         =  4.615478477                   (1/df) Deviance =   .7692464
+Pearson          =  4.609224387                   (1/df) Pearson  =   .7682041
+
+Variance function: V(u) = u*(1-u/n)               [Binomial]
+Link function    : g(u) = ln(u/(n-u))             [Logit]
+
+                                                  AIC             =   4.674247
+Log likelihood   = -16.69698926                   BIC             =  -7.861171
+
+------------------------------------------------------------------------------
+             |                 OIM
+           r | Coefficient  std. err.      z    P>|z|     [95% conf. interval]
+-------------+----------------------------------------------------------------
+        dose |   .2365929   .0203032    11.65   0.000     .1967995    .2763864
+       _cons |   -14.0864   1.228393   -11.47   0.000    -16.49401    -11.6788
+------------------------------------------------------------------------------
+
+. 
+. // Convert to individual format
+. expand n
+(473 observations created)
+
+. sort dose
+
+. 
+. // Make 'dead' 0/1 column - give each insect in each group an id (0, 1, ...),
+. // any insect with id < r is dead
+. gen rn = _n
+
+. egen grp_min_rn = min(rn), by(dose)
+
+. gen grp_idx = rn - grp_min_rn
+
+. gen dead = 1 if grp_idx < r
+(192 missing values generated)
+
+. replace dead = 0 if missing(dead)
+(192 real changes made)
+
+. 
+. glm dead dose, family(binomial) link(logit)
+
+Iteration 0:   log likelihood = -197.39167  
+Iteration 1:   log likelihood = -191.74715  
+Iteration 2:   log likelihood = -191.72933  
+Iteration 3:   log likelihood = -191.72933  
+
+Generalized linear models                         Number of obs   =        481
+Optimization     : ML                             Residual df     =        479
+                                                  Scale parameter =          1
+Deviance         =  383.4586582                   (1/df) Deviance =     .80054
+Pearson          =  478.0602265                   (1/df) Pearson  =   .9980381
+
+Variance function: V(u) = u*(1-u)                 [Bernoulli]
+Link function    : g(u) = ln(u/(1-u))             [Logit]
+
+                                                  AIC             =   .8055274
+Log likelihood   = -191.7293291                   BIC             =  -2574.782
+
+------------------------------------------------------------------------------
+             |                 OIM
+        dead | Coefficient  std. err.      z    P>|z|     [95% conf. interval]
+-------------+----------------------------------------------------------------
+        dose |   .2365929   .0203032    11.65   0.000     .1967994    .2763864
+       _cons |   -14.0864   1.228393   -11.47   0.000    -16.49401    -11.6788
+------------------------------------------------------------------------------
+
+. 
+end of do-file
+
+. exit, clear

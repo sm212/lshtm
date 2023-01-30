@@ -1,0 +1,143 @@
+---
+title: "Untitled"
+format: docx
+---
+
+```{r setup, echo=F, message=F, include=F, warning=F}
+library(dplyr)
+library(ggplot2)
+library(tidyr)
+df = haven::read_dta('ATREG_assign2022.dta')
+```
+
+Output of workings for assignment, not write up for submission
+
+# q1
+```{r}
+tab = df %>%
+  group_by(group) %>%
+  summarise(across(age:sdmt, list(m = mean, s = sd,
+                                  skew = moments::skewness,
+                                  kurt = moments::kurtosis,
+                                  low = min, high = max), na.rm = T)) %>% 
+  t() %>%
+  as.data.frame() %>% 
+  mutate(V1 = ifelse(is.infinite(abs(V1)), NA, round(as.numeric(V1), 1)),
+         V2 = ifelse(is.infinite(abs(V2)), NA, round(as.numeric(V2), 1)),
+         measure = row.names(.))
+names(tab) = c('group1', 'group2', 'measure')
+row.names(tab) = NULL
+readr::write_csv(tab, 'out/baseline_table.csv', na = '')
+
+df %>%
+  filter(!is.na(cag)) %>%
+  ggplot(aes(x = cag)) +
+  geom_histogram(bins = 10)
+```
+
+# q2
+
+```{r}
+t_test = t.test(df$sdmt ~ as.factor(df$group))
+f_test = var.test(df$sdmt ~ as.factor(df$group))
+
+df_m = df %>%
+  mutate(age = age - mean(age),
+         group = as.factor(group))
+
+df2 = df %>%
+  filter(group == 2) %>%
+  mutate(age = age - mean(age),
+         cag = cag - mean(cag))
+
+cor(df$age, df$sdmt)
+cor(df$age[df$group == 1], df$sdmt[df$group == 1])
+cor(df$age[df$group == 2], df$sdmt[df$group == 2])
+
+m1 = lm(sdmt ~ group + age, data = df_m)
+
+# Model checks for m1
+df_m$preds = predict(m1, df_m)
+df_m$resid = df_m$sdmt - df_m$preds
+par(mfrow = c(2, 2))
+plot(m1)
+plot(df_m$group, df_m$resid)
+plot(df_m$age, df_m$resid)
+
+m2 = lm(sdmt ~ age, data = df2)
+m3 = lm(sdmt ~ cag, data = df2)
+m4 = lm(sdmt ~ age + cag, data = df2)
+
+
+cor(df2$age, df2$cag)
+plot(m2)
+plot(m3)
+plot(m4)
+
+df2$preds = predict(m3, df2)
+df2$resid = df2$sdmt - df2$preds
+
+plot(df2$cag, df2$resid)
+plot(df2$age, df2$resid)
+
+```
+
+```{r}
+df3 = df %>%
+  mutate(grp = case_when(group == 1 ~ 1,
+                         cag <= 42 ~ 2,
+                         cag > 42 ~ 3),
+         age_c = age - mean(age))
+
+df3 %>%
+  group_by(grp) %>%
+  summarise(across(age:sdmt, ~moments::kurtosis(.x)))
+
+m5 = lm(sdmt ~ as.factor(grp), data = df3)
+m6 = lm(sdmt ~ as.factor(grp) + age_c, data = df3)
+
+df_plt = df3
+df_plt$pred = predict(m6, df3)
+df_resid = df_plt$sdmt - df_plt$pred
+
+coefs = coef(m6)
+grp_avg = tibble(grp = as.factor(1:3),
+                 intercept = coefs[1] - coefs[4]*mean(df3$sdmt) + c(0, coefs[2], coefs[3]),
+                 slope = coefs[4],
+                 adj_sdmt = coefs[1] + c(0, coefs[2], coefs[3]),
+                 lab = c('Group 1\nHealthy controls', 'Group 2\nCAG <= 42',
+                         'Group 3\nCAG > 42'),
+                 eqn = paste0('Intercept = ', format(intercept, digits = 1, nsmall = 1),
+                              '\nSlope = ', format(slope, digits = 1, nsmall = 1),
+                              '\nAge adj. mean SDMT = ', format(adj_sdmt, digits = 1, nsmall = 1)))
+
+df_plt %>% 
+  mutate(grp = as.factor(grp),
+         lab = case_when(grp == 1 ~ 'Group 1\nHealthy controls',
+                         grp == 2 ~ 'Group 2\nCAG <= 42',
+                         grp == 3 ~ 'Group 3\nCAG > 42')) %>%
+ggplot(aes(colour = lab, shape = lab)) +
+  geom_point(aes(age, sdmt), show.legend = F, alpha = 0.7, size = 2) +
+  geom_abline(data = grp_avg, mapping = aes(intercept = intercept,
+                                            slope = slope, colour = lab),
+              show.legend = F, size = 1) +
+  geom_text(data = grp_avg, aes(x = 68, y = 85, label = eqn),
+            colour = 'grey40', hjust = 1, vjust = 1, size = 2.5) +
+  facet_wrap(~lab, nrow = 1) +
+  theme(plot.title = element_text(size = 14, face = 'bold.italic'),
+        plot.subtitle = element_text(size = 13, face = 'italic', hjust = 0.02,
+                                     colour = 'grey50'),
+        plot.title.position = 'plot',
+        text = element_text(size = 12),
+        strip.text = element_text(face = 'bold'),
+        panel.background = element_rect(fill = 'transparent', colour = 'black'),
+        strip.background = element_rect(fill = 'grey95', colour = 'black'),
+        panel.grid.major.y = element_line(colour = 'grey90'),
+        panel.grid.minor = element_blank(),
+        panel.grid.major.x = element_blank()) +
+  labs(title = 'SDMT score by age & group', 
+       subtitle = 'Solid line shows predictions from ANCOVA model of age & group. Coefficient estimates shown in top right',
+       x = '\nAge (years)', y = 'SDMT score\n(higher is better)\n')
+
+ggsave('p4.png', dpi = 300, height = 4.09, width = 8.69, units = 'in')
+``` 

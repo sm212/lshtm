@@ -1,0 +1,211 @@
+---
+format: 
+  pdf: 
+    geometry:
+      - top=20mm
+      - left=15mm
+      - right=15mm
+      - bottom=20mm
+      - heightrounded
+---
+
+```{r setup, echo=F, message=F, include=F, warning=F}
+
+```
+
+# Question 1
+
+## Part a
+Let $X = \text{Number of events in group 0}$ and $Y = \text{Number of events in group 1}$. Then $X \sim \text{Binom}(n_0, \pi_0)$ and $Y \sim \text{Binom}(n_1, \pi_1)$. Since $X$ and $Y$ are independent, the joint likelihood $L$ factors as
+
+$$
+\begin{aligned}
+\ln L &= \ln(P(X = k_0)\,P(Y = k_1)) = \ln\left( \binom{n_0}{k_0}\pi_0^{k_0}(1-\pi_0)^{n_0-k_0}\,\binom{n_1}{k_1}\pi_1^{k_1}(1-\pi_1)^{n_1-k_1}\right) \\
+      &= k_0\ln \pi_0 + (n_0 - k_0)\ln(1 - \pi_0) + k_1\ln \pi_1 + (n_1 - k_1)\ln(1 - \pi_1)
+\end{aligned}
+$$
+
+Ignoring any terms which don't depend on $\pi_0,\, \pi_1$.
+
+## Part b
+
+#### Part i
+The MLE is the value of $\pi_0$ which maximises the log likelihood. The first & second derivatives with respect to $\pi_0$ are
+
+$$
+\frac{\partial}{\partial \pi_0}\ln L = \frac{k_0}{\pi_0} -\frac{n_0 - k_0}{1 - \pi_0} \quad\quad\quad\quad\frac{\partial^2}{\partial \pi_0^2}\ln L = -\left(\frac{k_0}{\pi_0^2} + \frac{n_0 - k_0}{(1 - \pi_0)^2}\right)
+$$
+
+Setting the first derivative to zero and solving gives $\widehat{\pi_0} = k_0 / n_0$, and (since the second derivative is always negative for any value of $\pi_0$) this is a maximum - so $\widehat{\pi_0} = k_0 / n_0$ is the MLE.
+
+#### Part ii
+Using statement A, the MLE for $\text{logit}(\pi_0)$ is $\text{logit}\left(\widehat{\pi_0}\right)$ which is
+  
+$$
+\text{logit}\left(\widehat{\pi_0}\right) = \ln\left(\frac{\widehat{\pi_0}}{1 - \widehat{\pi_0}}\right) = \ln\left(\frac{k_0 / n_0}{1 - k_0 / n_0}\right) = \ln\left(\frac{k_0}{n_0 - k_0}\right)
+$$
+
+## Part c
+
+#### Part i
+Using statement A, the MLE for the risk difference is $\widehat{\pi_1} - \widehat{\pi_0}$. By symmetry, the MLE of $\pi_1$ is $\widehat{\pi_1} = k_1/n_1$, so the MLE of the risk difference is $\widehat{\pi_1} - \widehat{\pi_0} = k_1/n_1 - k_0/n_0$.  
+  Using statement B, the standard error of the risk difference is $\sqrt{\text{se}\left(\widehat{\pi_0}\right)^2 + \text{se}\left(\widehat{\pi_1}\right)^2}$. The formulas for $\text{se}\left(\widehat{\pi_0}\right)^2$ and $\text{se}\left(\widehat{\pi_1}\right)^2$ are given in the question, so the standard error is $\sqrt{k_0(n_0 - k_0) / n_0^3 + k_1(n_1 - k_1) / n_1^3}$.
+
+#### Part ii
+Statement A says the MLE for the log odds ratio is
+
+$$
+\ln\left(\frac{\widehat{\pi_1} / (1 - \widehat{\pi_1})}{\widehat{\pi_0} / (1 - \widehat{\pi_0})}\right) = \ln\left(\left(\frac{k_1}{n_1 -k_1}\right) \bigg/ \left(\frac{k_0}{n_0 - k_0}\right)\right)
+$$
+
+Statement B says the standard error is $\sqrt{\text{se}\left(\text{logit}\widehat{\pi_0}\right)^2 + \text{se}\left(\text{logit}\widehat{\pi_1}\right)^2}$, and using the formula given in the question this is $\sqrt{1/k_0 + 1/(n_0 - k_0) + 1/k_1 + 1/(n_1 - k_1)}$.
+
+# Question 2
+
+## Part a
+
+The 2 by 2 table for survival at 3 months is:
+
+|       | Radiotherapy only | Radiotherapy and surgery |
+|:-----:|:-----------------:|:-------------------------:|
+|  Died |         12        |             5             |
+| Alive |         20        |             24            |
+
+The risk of death in the radiotherapy only group is $\pi_0 = 12 / 32$ and the radiotherapy & surgery group is $\pi_1 = 5 / 29$. The odds of death in each group are $12 / 20$ and $5 / 24$ respectively, giving a risk difference and odds ratio of
+
+$$
+\begin{aligned}
+\text{risk difference} &= 5 / 29 - 12 / 32 = -0.20 \\
+\text{log odds ratio} &= \ln(5 / 24 \, \big/ \, 12 / 20) = -1.05 \\
+\text{odds ratio} &= 5 / 24 \, \big/ \, 12 / 20 = 0.35
+\end{aligned}   
+$$
+
+## Part b
+
+This setup is the same as question 1, with $n_0 = 32, k_0 = 12, n_1 = 29, k_1 = 5$. The 90% confidence intervals are given by $x \,\pm \, 1.64 \times\text{se}$, where $1.64$ is the $0.95$ quantile of the standard normal. These intervals are approximate because formulas for the standard errors come from the quadratic approximation of the log likelihood ratio. Log likelihood ratios aren't exactly quadratic in most situations, so there will be some numerical error from using this approximation.
+
+  Using the formulas from question 1, the standard errors are:
+  
+$$
+\begin{aligned}
+\text{se(risk difference)} &= \sqrt{\frac{k_0(n_0 - k_0)}{n_0^3} + \frac{k_1(n_1 - k_1)}{n_1^3}} = 0.11 \\
+\text{se(ln(odds ratio))} &= {\sqrt{1/k_0 + 1/(n_0 - k_0) + 1/k_1 + 1/(n_1 - k_1)}} = 0.61
+\end{aligned}
+$$
+
+Which gives the 90% confidence intervals as
+
+$$
+\begin{aligned}
+\text{risk difference} &= [-0.20 - 1.64\times 0.11, -0.20 + 1.64 \times 0.11] = [-0.04, -0.02] \\
+\text{log odds ratio} &= [\ln(0.35) - 1.64 \times 0.61, \ln(0.35) + 1.64 \times 0.61] = [-2.05, -0.05] \\
+\text{odds ratio} &= [\exp(-2.05), \exp(-0.05)] = [0.13, 0.95]
+\end{aligned}
+$$
+
+The risk difference interval doesn't contain $0$, and the odds ratio interval doesn't contain $1$. As both intervals don't contain their null value, the interpretation is - people receiving radiotherapy & surgery have significantly lower risk of death at 3 months compared to people receiving just radiotherapy (at the 90% level). Both intervals are close to the null value, so the p-values will be just below 0.1, there is evidence of an effect but it isn't strong evidence.
+
+# Question 3
+
+## Part a
+The model is $X_1, \dots, X_n \sim N(0, \sigma^2)$ and the $X_i$ are all independent & identically distributed. The null ($H_0$) and alternative ($H_1$) hypotheses are
+
+$$
+H_0: \sigma^2 = \sigma_0^2 \quad\quad\quad\quad H_1: \sigma^2 \neq \sigma_0^2
+$$
+
+## Part b
+
+The general formula for a likelihood ratio test statistic is $\tau_{LR} = -2[\ln(\text{max}_{H_0}L) - \ln(\text{max}_{H_1}L)]$, and for the Wald test statistic the general formula is $\tau_W = (\theta_{ML} - \theta) / s$. In these equations $L$ is the likelihood, $\theta_{ML}$ is the MLE of $\theta$, and $s$ is the standard error of the MLE given by the equation
+
+$$
+\frac{-1}{s^2} = \frac{\partial^2}{\partial\theta^2}\ln L \bigg\vert_{\theta_{ML}}
+$$
+
+These statistics are distributed as $\tau_{LR} \sim \chi_1^2$ and $\tau_W \sim N(0, 1)$.  \newline\newline
+  The log likelihoods under the different hypotheses are (using $v^2 = \frac{1}{n}\sum_{i = 1}^n x_i^2$ and ignoring terms which don't depend on the parameter)
+  
+$$
+\begin{aligned}
+H_0:\quad\quad \ln L &= \ln\left(\prod_{i = 1}^n \frac{1}{\sqrt{2\pi\sigma_0^2}}\exp\left[-x_i^2/2\sigma_0^2\right]\right) = \sum_{i = 1}^n \ln[(2\pi\sigma_0^2)^{-1/2}] - \frac{1}{2\sigma_0^2}\sum_{i= 1}^n x_i^2 =  -\frac{n}{2}\ln\sigma_0^2 - \frac{nv^2}{2\sigma_0^2} \\
+H_1:\quad\quad \ln L &= -\frac{n}{2}\ln\sigma^2 - \frac{nv^2}{2\sigma^2}
+\end{aligned}
+$$
+
+The first & second derivatives under $H_1$ with respect to $\sigma^2$ are
+
+$$
+\frac{\partial}{\partial (\sigma^2)}\ln L = \frac{-n}{2\sigma^2} + \frac{nv^2}{2(\sigma^2)^2} \quad\quad\quad\quad\frac{\partial^2}{\partial( \sigma^2)^2}\ln L = \frac{n}{2(\sigma^2)^2} - \frac{nv^2}{(\sigma^2)^3}
+$$
+
+Setting the first equation to zero gives a MLE of $\sigma^2_{ML} = v^2$. The second derivative at $v^2$ is $\frac{-n}{2v^4}$ which is negative, so $v^2$ is a maximum.  
+  
+  This also gives an equation for $s$
+
+$$
+\frac{-1}{s^2} = \frac{\partial^2}{\partial\theta^2}\ln L \bigg\vert_{\theta_{ML}} \implies \frac{1}{s^2} = \frac{n}{2v^4} \implies s = \sqrt{\frac{2}{n}}v^2
+$$
+
+#### Part i
+As $H_0$ only has one value for $\sigma^2$, the first term in the log likelihood ratio is $\ln L(\sigma_0^2)$. Under $H_1$ the maximum occurs at the MLE, so the second term in the log likelihood ratio is $\ln L(v^2)$. This gives a likelihood ratio statistic of
+
+$$
+\tau_{LR} = -2[\ln L(\sigma_0^2) - \ln L(v^2)] =  -2\left[-\frac{n}{2}\ln\sigma_0^2 - \frac{nv^2}{2\sigma_0^2} - \left(-\frac{n}{2}\ln v^2 - \frac{n}{2}\right)\right] = n\left[\left(\frac{v^2}{\sigma_0^2} - 1\right) + \ln\frac{\sigma_0^2}{v^2}\right]
+$$
+
+#### Part ii
+All the terms were calculated at the start of the question, so the Wald statistic is
+
+$$
+\tau_W = \frac{\sigma_{ML}^2 - \sigma_0^2}{s} = \frac{v^2 - \sigma_0^2}{\sqrt{2/n}v^2} = \sqrt{\frac{n}{2}}\left(1 - \frac{\sigma_0^2}{v^2}\right)
+$$
+
+## Part c
+
+#### Part i
+
+$v^2$ is a biased estimator for $\sigma^2$. A better (unbiased) estimator is $\frac{1}{n-1}\sum_{i = 1}^n x_i^2 = \frac{n}{n-1}v^2$. For small values of $n$ the difference between $n-1$ and $n$ is large, so the bias will cause $v^2$ to underestimate the true $\sigma^2$ and will make the Wald statistic overly large for small samples, leading to a higher type 1 error rate. 
+
+#### Part ii
+A better version of the Wald statistic would be to use the unbiased estimator instead. The value of $s$ at this point is
+
+$$
+\frac{-1}{s^2} = \frac{\partial^2}{\partial\sigma^2}\ln L \bigg\vert_{\frac{n}{n-1}v^2} = \frac{n}{2(\sigma^2)^2} - \frac{nv^2}{(\sigma^2)^3} \bigg\vert_{\frac{n}{n-1}v^2} = \left(\frac{2 - n}{2}\right)\left(\frac{n - 1}{nv^2}\right)^2 \implies s = \sqrt{\frac{2}{n - 2}}\,\frac{nv^2}{n - 1}
+$$
+
+This gives a Wald statistic of
+
+$$
+\widetilde{\tau_W} = \cfrac{\frac{n}{n - 1}v^2 - \sigma_0^2}{s} = \sqrt{\frac{n - 2}{n}} \, \left(1 - \frac{n - 1}{n} \frac{\sigma_0^2}{v^2}\right)
+$$
+
+#### Part iii
+No idea!
+
+# Question 4
+
+## Part a
+The smallest possible value is zero (all crosses on the right hand side of the 'no preference' point) and the largest possible value is $15$ (all crosses on the left hand side, so the statistic is $5+4+3+2+1 = 15$). Any other value between $0$ and $15$ can be written as a sum of the numbers $1 \dots 5$, so the sample space is $\{0, 1, 2, \dots, 12, 13, 14, 15\}$.
+
+## Part b
+The test statistic is made up of $2$ independent terms - the position of the crosses (if they are on the left or right of the 'no preference' point), and the value of the ranks (which will be some permutation of $1 \dots 5$). The null hypothesis says the drugs are equally effective, so each cross has probability $1/2$ of being on the left hand side & probability $1/2$ of being on the right. Overall then, each configuration of the crosses has probability $1 / 2^5$. Since each configuration is equally likely, we can just count the total number of ways to write each possible test statistic using the numbers $1 \dots 5$ and multiply by $1 / 2^5$ to get the sampling distribution.  
+
+  There is only one possible configuration for $0, 1,$ and $2$. There's two configurations which give a value of $3$ - either the cross with rank $3$ is on the left and all others are on the right, or the crosses with ranks $1$ and $2$ are on the left and all others on the right. The table below shows the number of ways to write each value, and the probability ($= \text{Number of configurations} \times 1/2^5$) for the sample space. To save space the test statistic values are in the first & fourth columns, and the total probability may not sum to 1 because of rounding:
+  
+| Test Statistic | Configurations | Probability | Test Statistic | Configurations | Probability |
+|:--------------:|:--------------:|:-----------:|:--------------:|:--------------:|:-----------:|
+|        0       |        1       |    0.031    |        8       |        3       |    0.094    |
+|        1       |        1       |    0.031    |        9       |        3       |    0.094    |
+|        2       |        1       |    0.031    |       10       |        3       |    0.094    |
+|        3       |        2       |    0.063    |       11       |        2       |    0.063    |
+|        4       |        2       |    0.063    |       12       |        2       |    0.063    |
+|        5       |        3       |    0.094    |       13       |        1       |    0.031    |
+|        6       |        3       |    0.094    |       14       |        1       |    0.031    |
+|        7       |        3       |    0.094    |       15       |        1       |    0.031    |
+
+## Part c
+Since we're doing a two sided test, the probability in either tail must be $0.05$ or lower. Looking at the table this gives a rejection region of $\{0, 15\}$, which has a type 1 error of $0.062$.
+
+## Part d
+Scores $\{3.1,\, 5.2,\, −0.7,\, 4.8,\, 5.0\}$ give a test statistic of $1$. This is not in the rejection region, so we don't reject the null and conclude there is no significant difference in the drugs - drug A is no more effective at pain relief compared to drug B, at the $10\%$ level.
