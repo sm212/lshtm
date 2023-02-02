@@ -11,7 +11,7 @@ Aim:
   plaque, adjusting for confounders.
 
 Last modified on: 
-  20230129
+  20230202
 
 NOTES: 
   * This file will only run if the data file (assign2023.dta) is in the same
@@ -19,9 +19,9 @@ NOTES:
   file saved in the same location before running this file.
   * The code uses bootstrapping to estimate confidence intervals for odds ratios
   in part 2. The bootstrap uses 1000 replications so can take a while to run.
-  The do_boot scalar below switches the bootstrap code on or off - I've turned 
-  it off to save you waiting around, but if you want to run the bootstrap 
-  just set do_boot = 1.
+  The do_boot scalar below switches the bootstrap code on or off - I've kept the
+  bootstrap setion on so the code reproduces everything in the report. If you
+  want to turn the bootstrap section off just set do_boot = 0.
 */
 
 scalar do_boot = 1  // Do you want to run bootstrap (=1) or not (=0)?
@@ -33,14 +33,30 @@ scalar do_boot = 1  // Do you want to run bootstrap (=1) or not (=0)?
 use "assign2023.dta", clear
 codebook // No missing data except for plaque_count (70% missing)
 
+// Make table 1 - first make wider age groups to save space in report
+gen ageg = 1 if age_cat <= 2
+replace ageg = 2 if age_cat > 2 & age_cat <= 4
+replace ageg = 3 if age_cat > 4
+label define ageg_labs 1 "40-49" 2 "50-59" 3 "60-69"
+label values ageg ageg_labs
+
+foreach var of varlist ageg sex education smoking {
+	tabulate `var' plaque, row
+	bysort `var': summarize plaque_count if !missing(plaque_count)
+}
+
+// Extra bits - not included in report
+
+// How does plaque vary with whr within the categories? 
+lowess plaque whr, by(education) // No sign of interaction
+lowess plaque whr, by(sex)       // Bit steeper in males
+lowess plaque whr, by(age_cat)   // Generally increases, bit weird in 50-4, 65-9
+lowess plaque whr, by(smoking)   // Potential interaction in current smokers
+
 // Crosstabs to examine relation between plaque status & categorical variables
 foreach var of varlist age_cat education smoking sex {
 	tabulate `var' plaque, chi2
 }
-
-// Make table 1 - sex, plaque status, plaque count as columns
-
-bysort sex: tabulate age_cat
 
 ********************************************************************************
 ****** Part 2 - smoking & plaque status
@@ -54,20 +70,26 @@ glm plaque i.smoking i.age_cat i.sex i.education, family(binomial n) link(logit)
 di 1 - chi2(e(df), e(deviance)) // p = .41822, no evidence of poor fit
 est store m0
 
-// More complex models & LR tests
-glm plaque i.smoking##i.age_cat i.sex i.education, family(binomial n) link(logit)
+// More complex models & LR tests - fit quietly to save on uneeded output
+qui glm plaque i.smoking##i.age_cat i.sex i.education, family(binomial n) link(logit)
 est store m1
-glm plaque i.smoking i.age_cat##i.education i.sex, family(binomial n) link(logit)
+qui glm plaque i.smoking i.age_cat##i.education i.sex, family(binomial n) link(logit)
 est store m2
-glm plaque i.smoking##i.sex i.age_cat i.education, family(binomial n) link(logit)
+qui glm plaque i.smoking##i.sex i.age_cat i.education, family(binomial n) link(logit)
 est store m3
-glm plaque i.smoking##i.age_cat##i.sex##i.education, family(binomial n) link(logit)
+qui glm plaque i.smoking##i.age_cat##i.sex##i.education, family(binomial n) link(logit)
 est store m4
 
 lrtest m0 m1 // p = .659
 lrtest m0 m2 // p = .891
 lrtest m0 m3 // p = .155
 lrtest m0 m4 // p = .418. Stick with initial model since no p < .05
+
+// Residual analysis - no strong pattern, random scatter about 0. Good fit
+qui glm plaque i.smoking i.age_cat i.sex i.education, family(binomial n) link(logit)
+predict resid, pearson standard
+gen rn = _n 
+lowess resid rn, yline(0, lcolor(black))
 
 // Switch back to individual level data & get marginal probs for smoking
 use "assign2023.dta", clear
@@ -115,7 +137,7 @@ if do_boot {
 
 // Sense check - does empirical standardisation get same probabilities?
 // First refit the model after running bootstrap to be consistent
-glm plaque i.smoking i.age_cat i.sex i.education, family(binomial) link(logit)
+qui glm plaque i.smoking i.age_cat i.sex i.education, family(binomial) link(logit)
 
 gen smoking_orig = smoking
 replace smoking = 1     // Make everyone never smokers
@@ -130,6 +152,7 @@ replace smoking = smoking_orig
 drop smoking_orig
 
 summarize pred_never pred_ex pred_current // Means are same as margins output
+drop pred_never pred_ex pred_current      // Tidy up
 
 ********************************************************************************
 ****** Part 3 - waist to hip ratio (whr) & plaque status
@@ -137,22 +160,16 @@ summarize pred_never pred_ex pred_current // Means are same as margins output
 gen w2h = 10 * whr // Scaled so coef is 0.1 unit change
 
 // Add waist to hip ratio, examine poss interaction with LR tests
-glm plaque i.smoking i.age_cat i.sex i.education, family(binomial) link(logit)
+qui glm plaque i.smoking i.age_cat i.sex i.education, family(binomial) link(logit)
 est store m0
-glm plaque w2h i.smoking i.age_cat i.sex i.education, family(binomial) link(logit)
+glm plaque w2h i.smoking i.age_cat i.sex i.education, family(binomial) link(logit) 
 est store m1
 lrtest m0 m1 // p < 0.0001. Definite improvement to model from part 2
 
-// How does whr vary by other vars? Trying to look for potential interactions
-lowess plaque whr, by(education) // No sign of interaction
-lowess plaque whr, by(sex)       // Bit steeper in males
-lowess plaque whr, by(age_cat)   // Maybe in the older groups
-lowess plaque whr, by(smoking)   // Yes - smokers have very different shape
-
 // Try interactions between age_cat and smoking
-glm plaque c.w2h##i.smoking i.age_cat i.sex i.education, family(binomial) link(logit)
+qui glm plaque c.w2h##i.smoking i.age_cat i.sex i.education, family(binomial) link(logit)
 est store m2
-glm plaque c.w2h##i.age_cat i.smoking i.sex i.education, family(binomial) link(logit)
+qui glm plaque c.w2h##i.age_cat i.smoking i.sex i.education, family(binomial) link(logit)
 est store m3
 
 lrtest m1 m2
@@ -167,8 +184,8 @@ lrtest m1 m4 // p = 0.6931. Keep because model useful for our aims
 lincom w2h, eform
 lincom w2h + 1.sex#w2h, eform
 
-// Prevalence estimates if no-one obese - similar to empirical standardisation
-// Make changes in w2h based on WHO guidelines
+// Prevalence estimates if no-one obese:
+// Make changes in w2h based on WHO guidelines, then get marginals
 gen whr_who = whr
 replace whr_who = 0.9 if sex == 1 & whr > 0.9
 replace whr_who = 0.85 if sex == 0 & whr > 0.85
@@ -190,15 +207,35 @@ drop w2h_who
 drop w2h_copy
 
 ********************************************************************************
-****** Part 4 - modelling count data (Poisson & negative binomial models)
+****** Part 4 - modelling count data (negative binomial models)
 
 // Filter to observations with plaque_count recorded
 keep if !missing(plaque_count)
 
-// Compare means to variances for categoricals, to check for overdispersion
-foreach var of varlist smoking age_cat sex education {
-	bysort `var': summarize plaque_count
-}
-/*
+// Fit negative binomial models due to overdispersion from part 1
+nbreg plaque_count i.smoking i.age_cat i.sex i.education
+est store m0
 
-*/
+// Try interactions between age & sex, age & smoking
+qui nbreg plaque_count i.smoking i.age_cat##i.sex i.education
+est store m1
+qui nbreg plaque_count i.smoking##i.age_cat i.sex i.education
+est store m2
+
+lrtest m0 m1
+lrtest m0 m2 // Not significant, dont add to model
+
+// For part 4a
+nbreg plaque_count i.smoking i.age_cat i.sex i.education
+lincom 2.smoking, eform // Mean plaque count increase - ex vs never smokers
+lincom 3.smoking, eform // Current vs never smokers
+
+
+// For part 4b - add w2h to model
+nbreg plaque_count w2h i.smoking i.age_cat i.sex i.education
+lincom w2h, eform // Mean plaque count increase for 0.1 increase in whr
+
+// For part 4c - add interaction on w2h & sex
+nbreg plaque_count c.w2h##i.sex i.smoking i.age_cat i.education
+lincom w2h, eform // Females
+lincom w2h + 1.sex#c.w2h, eform // Males
