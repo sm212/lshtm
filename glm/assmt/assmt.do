@@ -8,7 +8,7 @@ Aim:
   To quantify the effect of smoking and waist to hip ratio on carotid
   plaque, adjusting for confounders.
 
-Last modified on: 20230206
+Last modified on: 20230207
 
 NOTES: 
   * This file will only run if the data file (assign2023.dta) is in the same
@@ -20,7 +20,7 @@ NOTES:
   bootstrap setion on so the code reproduces everything in the report. If you
   want to turn the bootstrap section off just set do_boot = 0. Please make sure
   you run line 26 to define do_boot, otherwise stata will complain when it gets
-  to the bootstrap code on line 149
+  to the bootstrap code on line 153
 */
 
 scalar do_boot = 1  // Do you want to run bootstrap (=1) or not (=0)?
@@ -43,6 +43,10 @@ foreach var of varlist ageg sex education smoking {
 	tabulate `var' plaque, row
 	bysort `var': summarize plaque_count if !missing(plaque_count)
 }
+
+summarize plaque
+total plaque
+summarize plaque_count // Total row (put at bottom of table 1)
 
 // Rest of this section extra bits to potentially mention in text (if space)
 cor whr plaque
@@ -113,7 +117,7 @@ glm plaque i.smoking i.age_cat i.sex i.education, family(binomial) link(logit)
 
 margins i.smoking
 // Store probs and calculate odds ratios. Also get lower & upper for never
-// smoker prob (needed for line 123)
+// smoker prob (needed for line 130)
 scalar p_never = r(table)[1, 1] // .590
 scalar p_ex = r(table)[1, 2]    // .612
 scalar p_cu = r(table)[1, 3]    // .715
@@ -150,6 +154,15 @@ if do_boot {
 	bootstrap ex = r(ex_v_never) cu = r(cu_v_never), rep(1000) seed(43): or_bs
 	estat bootstrap, percentile
 }
+
+// P-values for ORs, from https://www.bmj.com/content/bmj/343/bmj.d2304.full.pdf
+matrix ci = e(ci_percentile)
+scalar se_ex = (log(ci[1, 1]) - log(ci[2, 1])) / (2 * 1.96)
+scalar se_cu = (log(ci[1, 2]) - log(ci[2, 2])) / (2 * 1.96)
+scalar z_ex = abs(log(e(b)[1, 1]) / se_ex)
+scalar z_cu = abs(log(e(b)[1, 2]) / se_cu)
+
+di exp(-0.717 * z_ex - 0.416 * z_ex^2), exp(-0.717 * z_cu - 0.416 * z_cu^2)
 
 // Sense check - does empirical standardisation get same marginal probs?
 // First refit the model after running bootstrap to be consistent
@@ -194,7 +207,7 @@ No strong pattern in residuals, and lowess curve lies close to y = x curve in
 the calibration plot - no evidence of poor fit or calibration. Happy to use 
 this model as the base model for this section (then + sex w2h interaction) for
 last part of the section. Check for interactions between other vars, if LR test
-is sig then include extra term, if not then stick with model on line 181
+is sig then include extra term, if not then stick with model on line 194
 */
 
 // Try interactions between age_cat and smoking
