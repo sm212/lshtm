@@ -21,7 +21,7 @@ Linear regression can be summarised in one equation: $EY\vert\,X \sim N(X\beta, 
 The normal distribution is a member of the *exponential family*. The $p$ parameter exponential family has a density $f(x)$ of the form
 
 $$
-\ln f_\theta(x) = \sum_{i = 1}^p \eta_iT_i(x) - A(\theta) + c(x)
+\ln f_\theta(x) = \sum_{i = 1}^p \eta_i(\theta)T_i(x) - A(\theta) + c(x)
 $$
 GLMs replace the assumption that the conditional mean is normally distributed with the assumption that the conditional mean is an exponential family distribution. For most applications it's better to work with the *exponential dispersion model* instead, which has a simpler form
 
@@ -71,7 +71,7 @@ So a one unit change in variable $i$ causes a $\beta_i$ unit change *on the link
 
 # Binary data - logistic regression part 1
 
-The canonical link function for binomial data is the logit $\ln[p/(1-p)]$. Models which use a logit as the response variable are called *logistic regression* models. So for binary data, the canonical GLM model is
+Suppose you have binary data $(X, y)$, where $y_i \sim Bern(p_i)$. The canonical link function for binomial data is the logit $\ln[p/(1-p)]$. Models which use a logit as the response variable are called *logistic regression* models. So for binary data, the canonical GLM model is
 
 $$
 \ln\left(\frac{p}{1-p}\right) = X\beta
@@ -173,7 +173,7 @@ $$
 (To derive this imagine $x_{n+1}$ is the root, calculate the slope at $x_n$ and solve for $x_{n+1}$). Applying this to the score equation gives an update rule
 
 $$
-\beta_{k+1} = \beta_k - H^{-1}\left(\beta_k\right)\nabla_\beta\ln L\left(\beta_k\right)
+\beta_{(k+1)} = \beta_{(k)} - H^{-1}\left(\beta_{(k)}\right)\nabla_\beta\ln L\left(\beta_{(k)}\right)
 $$
 Where $H$ is the matrix of derivative of the score function (or the second derivatives of the log likelihood), called the *Hessian*. Differentiating the equation for the $j^{th}$ component of the derivative of the log likelihood with respect to $\beta_k$ gives the $k, j$ element of $H$ as
 
@@ -201,7 +201,7 @@ logistic_byhand = function(X, y, max_iter = 25, tol = 1e-10){
   beta = rep(0, ncol(X)) # Initial guess for beta, to be updated using NR
   for (i in 1:max_iter){ 
     beta_old = beta
-    p = 1 / (1 + exp(-X %*% beta))
+    p = 1 / (1 + exp(-X %*% beta_old))
     D = diag(as.numeric(p * (1 - p)))
     H = -crossprod(X, D %*% X)
     score = t(X) %*% (y - p)
@@ -221,8 +221,238 @@ logistic_byhand(X, y)
 Which is exactly the same coefficients in `m2`.
 
 # Count data
-Count data is usually modelled using either the Poisson or negative binomial distributions.
+Count data is usually modelled using either the Poisson or negative binomial distributions. Poisson regression is usually taken as an initial model, and negative binomial is used if there's evidence of dispersion in the data. Similar to the binomial family we saw in the last section, there's also a quasipoisson family which allows the dispersion parameter to vary. If there is dispersion a Poisson model will not be able to model the data as accurately as a negative binomial or quasipoisson model. As these models better capture the variation in the data, negative binomial and quasipoisson models will differ to a poisson model in the standard errors and confidence intervals - parameter estimates will be similar or identical, regardless of which family is chosen.
 
+Suppose you have count data of the form $(X, y)$ where $y_i \sim Po(\lambda_i)$. $\lambda_i$ is the expected count in a given period. The canonical link function for Poisson data is the log, and the natural parameter is $\ln(\lambda)$. The canonical GLM for count data is
+
+$$
+\ln(\lambda)= X\beta
+$$
+
+Going through the same steps as we did in logistic regression, a one unit change in the $x_i$ variable is associated with a $\beta_i$ unit change on the link scale, that is
+
+$$
+\beta_i = \ln(\lambda_2) - \ln(\lambda_1) = \ln\left(\frac{\lambda_2}{\lambda_1}\right)
+$$
+
+So $e^{\beta_i}$ is a *rate ratio*. $\lambda$ is the expected number of events (adjusting for the variables $X$) - so $e^{\beta_i}$ is the multiplicative increase in mean number of events in person 2 relative to person 1. The same interpretation holds for negative binomial models.
+
+To fit count models, just change the `family` argument in `glm`. Here's a model which predicts length of stay in hospital (the *count* of the number of days someone is in hospital for) given their age group and the type of admission:
+
+```{r}
+medpar = haven::read_dta('http://www.stata-press.com/data/hh3/medpar.dta')
+
+m1 = glm(los ~ as.factor(age) + type2 + type3, data = medpar, family = poisson())
+broom::tidy(m1)
+```
+
+Compared to people of the same age group who are admitted to hospital by type 1, people admitted by type 2 have a length of stay which is $e^{0.236} = 1.27$ times longer (that is, 27% longer), and people admitted by type 3 have a length of stay more than twice as long as similar people admitted through type 1.
+
+Negative binomial models aren't included in the `glm` function by default, but the `MASS` package has an implementation if you want to fit a negative binomial model:
+
+```{r}
+m2 = MASS::glm.nb(los ~ as.factor(age) + type2 + type3, data = medpar)
+broom::tidy(m2)
+```
+
+The coefficient estimates are the slightly different but the standard errors are much larger. This is because the negative binomial model is able to more properly model the variation in the data, leading to more accurate standard error estimates. Fitting a quasipoisson model to this data results in a fitted dispersion parameter of 6.3, a value of 1 would mean no dispersion is present so there is significant over-dispersion in this data. This explains why the standard errors in the two models are so different.
+
+A third option to account for dispersion is to use robust standard errors. This can be done through the `sandwich` and `lmtest` packages:
+
+```{r}
+vcov = sandwich::vcovHC(m1, type = 'HC1') # Same variance-covariance matrix as stata
+lmtest::coeftest(m1, vcov = vcov)
+```
+
+Again these standard errors are much larger than the initial Poisson model, and are fairly similar to the standard errors from the negative binomial model. Setting  `type = 'HC1'` tells R to use the same algorithm stata uses when doing robust regression, which makes these estimates agree with stata (up to rounding).
+
+## Models for rates (+ calculating DSRs)
+The expected number of events $\lambda$ can be expressed in terms of a rate. If $\mu$ is the rate of events per unit time, then $\lambda = \mu t$. We can use this to write the count data GLM in terms of the rate:
+
+$$
+\begin{aligned}
+\ln(\lambda) &= X\beta \\
+\ln(\mu t) &= X\beta \\
+\implies \ln(\mu) &= \ln(t) + X\beta
+\end{aligned}
+$$
+So to model a rate, we just need to add the $\ln(t)$ term to the linear predictor. This is called an *offset*, because the coefficient is forced to be $1$ for the $\ln(t)$ term.
+
+As an example, lets have a go at calculating mortality rates in Kazakhstan and Sweden following [Germán Rodríguez's notes](https://grodri.github.io/demography/std):
+
+```{r}
+mortality = read.table("https://grodri.github.io/datasets/preston21long.dat",
+                       header = F, col.names = c("country", "ageg", "pop", "deaths"))
+
+mortality |>
+  dplyr::group_by(country) |>
+  dplyr::summarise(death_rate = 1e3 * sum(deaths) / sum(pop))
+```
+
+Sweden has a higher death rate than Kazakhstan, which feels weird. The issue is that Sweden has a lot more old people compared to Kazakhstan, and old people tend to die more than young people. It's not correct to compare the death rates because the age structure of the two countries are very different, age needs to be *adjusted for* in the analysis.
+
+Adjusting for things is exactly what regression is good for! So fit a model for the rates, adjusting for age:
+
+```{r}
+m3 = glm(deaths ~ country + ageg + offset(log(pop)), data = mortality, family = poisson)
+```
+
+The coefficient on the Sweden term is the mortality rate ratio for Sweden vs Kazakhstan, exponentiating gives `exp(coef(m3[2]))` = `r format(exp(coef(m3)[2]), digits = 3)` - after accounting for the different population structure in the two countries, mortality rates in Sweden is $38.1\%$ lower than Kazakhstan (or equivalently, mortality rates in Kazakhstan are $1 / 0.619 - 1 = 61.6\%$ higher than Sweden).  
+  This is very similar to how direct standardisation is done. The idea of direct standardisation uses the fact that rates are weighted sums and the mortality rate depends (1) the age specific mortality rate, and (2) the age structure of each country. Direct standardisation applies the age specific mortality rates of the two countries to a 'reference population'. This removes any possible age structure effect as the age specific rates are now being applied to the same 'standard' population. Below we calculate a reference population which is just the average of the two countries age structures, then use our modelled rates to estimate how many deaths we would see when applying each countries age specific rates to this reference population:
+
+```{r}
+av_pop = mortality |>
+  dplyr::group_by(ageg) |>
+  dplyr::summarise(pop = mean(pop))
+
+new_df = dplyr::bind_rows(av_pop |> dplyr::mutate(country = 'Sweden'),
+                          av_pop |> dplyr::mutate(country = 'Kazakhstan'))
+
+new_df$pred_deaths = predict(m3, newdata = new_df, type = 'response')
+new_df |>
+  dplyr::group_by(country) |>
+  dplyr::summarise(pred_deaths = sum(pred_deaths),
+            pop = sum(pop),
+            rate = 1e3 * pred_deaths / pop) 
+```
+
+Passing `type = response` to `predict` tells R to return predictions on the $y$ scale (counts, rather than log counts).  
+  The mortality rate in Sweden vs Kazakhstan is $6.59 / 10.6 = 0.622$, so mortality rates in Sweden are $1 - 0.622 = 37.8\%$ lower than Kazakhstan. This is very similar to the coefficient from the model. The model approach is generally better than calculating DSRs by hand - it's easier to do, allows you to adjust for other confounders, and you get confidence intervals for free (there are formulas for DSR confidence intervals, but they can be a bit involved).
+
+## How are these models fit?
+We can go through the steps we used to fit the logistic regression model by hand in the previous section if we wanted to. Instead of working through implementations for specific GLMs, we're now going to derive the way how R fits all GLMs - an algorithm called Iteratively Reweighted Least Squares.
+
+Suppose the response vector $y$ follows some 1-parameter exponential family distribution. The density $f$ has the form
+
+$$
+\ln f(y) =  \eta(\theta)T(y) - A(\theta) + c(y)
+$$
+For simplicity, assume that the distribution is in *canonical form*. This means that $\eta,\, T$ are both the identity function and we have the relationship $Ey = A'(\theta),\, Vy = A''(\theta)$. The log likelihood is then
+
+$$
+\ln L(y) = \ln \prod_{i = 1}^n f(y_i) = \sum_{i = 1}^n \ln f(y_i) = \sum_{i=1}^n \theta_i y_i - A(\theta_i) + c(y_i)
+$$
+As usual we will model the natural parameter with a linear predictor, $\theta = X\beta$. Writing things in terms of $\beta$ gives
+
+$$
+\ln L(\beta) = \sum_{i=1}^n x^T_i\beta\, y_i - A(x^T_i\beta) + c(y_i)
+$$
+We can differentiate this twice to get formulas for the elements of the score function and the Hessian
+
+$$
+\begin{aligned}
+\partial_{\beta_j} \ln L(\beta) = \sum_{i = 1}^n x^T_{i, j}\,y_i - x^T_{i, j}\,A'(x^T_i\beta) &\quad\implies\quad \nabla_\beta \ln L(\beta) = X^T(y - A'(X\beta)) \\
+\partial_{\beta_k}\partial_{\beta_j} \ln L(\beta) = -\sum_{i=1}^nx^T_{i,j}\,x^T_{i,k}\,A''(x^T_i\beta) &\quad\implies\quad H = -X^TDX, \,\,\, D = \text{diag}(A''(X\beta))
+\end{aligned}
+$$
+Using the relationship between the derivatives of $A$ and the mean and variance simplifies this to
+
+$$
+\begin{aligned}
+\nabla_\beta \ln L(\beta) &= X^T(y - Ey) \\
+H &= -X^TDX, \,\,\, D = \text{diag}(Vy)
+\end{aligned}
+$$
+If $y \sim Bern(p)$ then these formulas reduce to the ones we derived back in the logistic regression section. There is a relationship between the mean and the natural parameter $\theta$ given by the link function $g(Ey) = \theta$. Since we're modelling $\theta = X\beta$ we can write the mean in terms of the linear predictor as $Ey = g^{-1}(X\beta)$. We can put these into the usual Newton Raphson update step to estimate $\beta$
+
+$$
+\beta_{(k + 1)} = \beta_{(k)} - H^{-1}(\beta_{(k)})\nabla_\beta\ln L\left(\beta_{(k)}\right)
+$$
+
+This requires very slight modification to our previous code. We need to add in the inverse link function and a function to calculate the variance, then use the formulas for the score function and Hessian. R stores these function inside the `family` class of functions we've been passing to `glm`. Here's all the things stored in `poisson()`:
+
+```{r}
+names(poisson())
+```
+
+Which means we can just add a `family` argument and then access the inverse link and variance functions through that. One extra modification is needed to deal with models which include offsets. The linear predictor $X\beta$ is replaced by $X\beta + offset$, which is an easy enough change. This code fits any GLM which has a `family` function already built into R:\newpage
+
+```{r}
+glm_byhand = function(X, Y, family, offset = NULL, max_iter = 25, tol = 1e-10){
+  # X = design matrix, y = response vector, family = family class function
+  
+  beta = rep(0, ncol(X))
+  if (is.null(offset)) offset = 0
+  
+  for (i in 1:max_iter){
+    beta_old = beta
+    
+    mu = family$linkinv(X %*% beta_old + offset)
+    D  = diag(as.numeric(family$variance(mu)))
+    H  = -crossprod(X, D %*% X)
+    score = t(X) %*% (y - mu)
+    
+    beta = beta_old - solve(H, score)
+    if (sqrt(crossprod(beta - beta_old)) < tol) break
+  }
+  return(beta)
+}
+```
+
+Let's use this model to fit `m1` and `m3`
+
+```{r}
+X = model.matrix(m1)
+y = medpar$los
+glm_byhand(X, y, poisson())
+
+X = model.matrix(m3)
+y = mortality$deaths
+coefs_byhand = glm_byhand(X, y, poisson(), offset = log(mortality$pop))
+
+coefs_byhand[2] # log(DSR_swe / DSR_kaz), should be -0.479
+```
+
+This exactly matches the results we got from using the `glm` command.  
+
+  The code we just wrote is actually a very inefficient implementation of iteratively reweighted least squares (IRLS). To derive the IRLS algorithm, just put the equations for the score function and Hessian into the update rule
+  
+$$
+\begin{aligned}
+\beta_{(k + 1)} &= \beta_{(k)} - H^{-1}(\beta_{(k)})\nabla_\beta\ln L\left(\beta_{(k)}\right) \\
+&= \beta_{(k)} + \left[X^TDX\right]^{-1}X^T(y - Ey)
+\end{aligned}
+$$
+$D$ and $Ey$ both depend on $\beta_{(k)}$ but we're not writing that out (just to save on clutter). The $y - Ey$ term almost looks like a Wald statistic, except it isn't divided by the variance. Since $D = \text{diag}(Vy)$ and remembering that 'dividing' in matrix algebra becomes 'multiply by the inverse matrix', we define the vector $a = D^{-1}(y- Ey)$ because it looks like a Wald statistic, and write the update step in terms of $a$
+
+$$
+\beta_{(k + 1)} = \beta_{(k)} + \left[X^TDX\right]^{-1}X^TDa
+$$
+Now notice that we can write $\beta_{(k)}$ in the following, slightly strange looking, way
+
+$$
+\beta_{(k)} = \left[X^TDX\right]^{-1}\left[X^TDX\right]\beta_{(k)}
+$$
+Then the update step becomes
+
+$$
+\beta_{(k)} = \left[X^TDX\right]^{-1}X^TD(a + X\beta) = \left[X^TDX\right]^{-1}X^TDz
+$$
+This is the normal equation from linear regression, $\hat\beta = (X^TX)^{-1}X^Tz$, *weighted* by the variance matrix $D$. This is IRLS. We can implement IRLS by slightly modifying our code
+
+```{r}
+irls = function(X, y, family, offset = NULL, max_iter = 25, tol = 1e-10){
+  beta = rep(0, ncol(X))
+  if (is.null(offset)) offset = 0
+  
+  for (i in 1:max_iter){
+    beta_old = beta
+    
+    mu  = family$linkinv(X %*% beta_old + offset)
+    D   = diag(as.numeric(family$variance(mu)))
+    a   = solve(D, y - mu)
+    z   = a + X %*% beta_old 
+    XtD = crossprod(X, D)
+    
+    beta = solve(XtD %*% X, XtD %*% z)
+    if (sqrt(crossprod(beta - beta_old)) < tol) break
+  }
+  return(beta)
+}
+```
+
+This saves on computing the score function, and there are very efficient algorithms for solving the normal equations, so this implementation is more efficient than our previous one.
+ 
 # Model fit, checks, and performance
 
 # Observational data, marginal effects, collapsability
