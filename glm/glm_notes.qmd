@@ -240,7 +240,7 @@ So $e^{\beta_i}$ is a *rate ratio*. $\lambda$ is the expected number of events (
 To fit count models, just change the `family` argument in `glm`. Here's a model which predicts length of stay in hospital (the *count* of the number of days someone is in hospital for) given their age group and the type of admission:
 
 ```{r}
-medpar = haven::read_dta('http://www.stata-press.com/data/hh3/medpar.dta')
+medpar = haven::read_dta('practicals/data/medpar.dta')
 
 m1 = glm(los ~ as.factor(age) + type2 + type3, data = medpar, family = poisson())
 broom::tidy(m1)
@@ -455,7 +455,190 @@ This saves on computing the score function, and there are very efficient algorit
  
 # Model fit, checks, and performance
 
+## Fit and performance
+We've fit a bunch of models so far, now we turn to quantifying model performance and fit. The models are fit through maximum likelihood, so R calculates the (estimated) maximum log likelihood when fitting models. This suggests that some sort of comparison of the maximum log likelihoods may be a good starting point for comparing models. If we have two nested models - that is, model 1 has parameters $\psi = (\psi_1, ..., \psi_a), \, \tau = (\tau_1, ..., \tau_b)$ and model 2 has parameters $\psi$ (so model 2 is a special case of model 1 where $\tau = 0$) - then the profile log likelihood ratio is distributed chi squared
+
+$$
+-2 (\ln L(\psi = \hat\psi, \tau = 0) - \ln L(\psi = \hat \psi, \tau = \hat\tau)) \sim \chi^2_{a}
+$$
+Which can be used to see if adding extra parameters to a model leads to significant improvements in model fit. Formally this is testing the null hypothesis that the simpler model is correctly specified, and small p-values are evidence against the null. These (profile) log likelihoods are the log likelihoods evaluated at the MLE for the parameters, they're exactly the maximum log likelihoods returned by R - it's no extra work to use these to construct the log likelihood ratio and test. As an example, the code below fits two models to the `cattle` data, here we're testing to see if the model with an interaction term has better fit than the model without:
+
+```{r}
+cattle = read.csv('practicals/data/cattle.csv')
+m1 = glm(cbind(infect, cattle - infect) ~ as.factor(group) + dfactor, 
+         data = cattle, family = binomial())
+m2 = glm(cbind(infect, cattle - infect) ~ as.factor(group) * dfactor, 
+         data = cattle, family = binomial())
+
+lr = -2 * (logLik(m1) - logLik(m2))[1]          # 0.258. [1] makes R store lr as a number
+df_resid = df.residual(m1) - df.residual(m2)    # m1 has 3 parameters, m2 has 4, 4 - 3 = 1
+1 - pchisq(lr, df_resid)                        # 0.611
+```
+
+There is no evidence that the interaction term leads to a significantly better fit.  In this case, since there's only one extra parameter, the Wald test gives a similar p-value (the two tests are asymptotically equivalent). If you have multiple extra parameters then the likilihood ratio test is testing the hypothesis that at least one of the coefficients is non-zero, which is a better test to do compared to looking at each coefficient individually because it avoids multiple testing.
+
+The absolute best model is the so-called *saturated model*, where every observation has its own parameter. In this case the model can exactly fit the data, so will be the best fit possible (and also the largest possible log likelihood). This gives a baseline to compare against when constructing the likelihood ratio. Here's the likelihood of the saturated model for the cattle data
+
+```{r}
+cattle$id = 1:nrow(cattle)
+m_sat = glm(cbind(infect, cattle - infect) ~ as.factor(id), 
+           data = cattle, family = binomial())
+logLik(m_sat)
+```
+
+Using the saturated log likelihood in the likelihood ratio gives the *scaled deviance* of the model:
+
+$$
+S = -2  \ln\left(\frac{L_m}{L_s}\right) = -2 (\ln L_m - \ln L_s)
+$$
+
+The deviance is just the scaled deviance multiplied by the dispersion parameter, $D = \phi S$. Large values of the deviance (scaled or unscaled) mean that your model has a much larger log likelihood than the best possible model, so your model is much worse than the best possible model. It's a 'badness of fit' measure - smaller values are better. The formula for the deviance is a log likelihood ratio, so $D \sim \chi^2_{n-p}$ where $p$ is the number of parameters in the model. This makes sense, every model is nested inside saturated model, because you can set some of the parameters of the nested model to zero to get any other model. The `deviance` function calculates deviance for a model:
+
+```{r}
+deviance(m1)
+
+# Calculate deviance by hand
+-2 * (logLik(m1) - logLik(m_sat))[1]
+
+# Compare to a chi squared with 10 - 3 = 7 DOF for p-value
+1 - pchisq(deviance(m1), df.residual(m1))
+```
+
+There is no evidence of poor model fit.
+
+Deviance is not a good measure of fit for individual data, because as the sample size $n$ gets larger so does the number of parameters needed to fit the saturated model. in the large sample limit the saturated model will have an infinite number of parameters, which invalidates the set up needed for constructing the profile log likelihood ratio. This doesn't happen for grouped data, where increasing the number of observations will increase the size within each of the groups but keep the number of groups constant.  
+  Since the issue comes from having individual data, it feels like a reasonable idea to group the data first and then calculate deviance (or some other summary statistic) on the grouped data. This is the idea behind the *Hosmer-Lemeshow* test - first the individual level data is grouped into $g$ groups, then the expected number of events in each group is calculated using the model, and that is compared to the observed number of events in each group. The grouping produces a $2 \times g$ table of counts, so a natural test statistic is the chi-squared. Hosmer & Lemeshow showed that the test statistic is distributed chi-squared with $g-2$ degrees of freedom
+  
+$$
+\chi^2 = \sum_{i = 1}^g \frac{\left(y_i - n_i\hat p_i\right)^2}{n_i\,\hat p_i\,(1-\hat p_i)} \sim \chi^2_{g - 2}
+$$
+Large values indicate that the predicted number of events are very different to the observed number of events, so large values indicate poor model fit. This tests the null hypothesis that the model is correctly specified, and a small p-value is evidence against the null.
+
+This feels like an intuitive test, but it turns out that the Hosmer-Lemeshow test isn't very good. It depends on an arbitrary grouping of the data, so you will get different p-values if you change the number of groups or if you change the criteria used to form the groups. As an example, the code below runs the Hosmer-Lemeshow test on the `lbw` data for a range of different group sizes:
+
+```{r}
+lbw = haven::read_dta('practicals/data/lbw.dta')
+m = glm(low ~ age + lwt + as.factor(race) + smoke + ptl + ht + ui,
+        data = lbw, family = binomial())
+
+lbw$p = predict(m, lbw, type = 'response')
+p_vals = vector('double', 10)
+for (i in 1:10){
+  lbw$grp = dplyr::ntile(lbw$p, n = i + 2)
+  df_agg = lbw |>
+    dplyr::group_by(grp) |>
+    dplyr::summarise(p_hat = mean(p),
+                     n = dplyr::n(),
+                     y = sum(low)) |>
+    dplyr::mutate(chi_sq = (y - n * p_hat)^2 / (n * p_hat * (1 - p_hat)))
+  
+  chi_sq = sum(df_agg$chi_sq)
+  p_vals[i] = 1 - pchisq(chi_sq, i)
+}
+p_vals
+```
+
+The p-values vary a lot - there is a strong dependence on the number of groups. In all cases the p-value is larger than 0.05, so we do not reject the null that the model is correctly specified (that is, the test doesn't find any evidence that the model is incorrectly specified).
+
+The Hosmer-Lemeshow test looks at how close the model predictions are to the observed data. This is a concept called *calibration*. A model is said to be "well calibrated" if the model predictions are close to the observed values. A better approach to assessing calibration is to use *flexible calibration curves*, which compares the predicted probabilities from your model against the observed empirical probabilities in the data. The idea is that, for each value of the fitted probability you can calculate the observed probability, and plotting these two quantities is a visual check of calibration. If the fitted probabilities agree with the observed probabilities, then the points will lie on the line $y = x$. The easiest way to so this is using a `lowess` smoother:
+
+```{r, eval=F}
+library(ggplot2)
+ggplot(lbw) +
+  geom_point(aes(x = p, y = low)) +
+  geom_smooth(aes(x = p, y = low)) +
+  geom_abline()
+```
+
+```{r, message=F, warning=F, echo=F}
+library(ggplot2)
+ggplot(lbw) +
+  geom_point(aes(x = p, y = low)) +
+  geom_smooth(aes(x = p, y = low)) +
+  geom_abline() +
+  labs(x = 'Fitted probability', y = 'Observed low birth weight') +
+  coord_cartesian(c(0, 0.8), c(0, 1))
+```
+
+The calibration curve (blue) is close to the best fit line for all values of the fitted probability, which means the fitted probability is close to the observed probability for all values of the fitted probability - the model has good calibration.
+
+Calibration by itself isn't very helpful. For example suppose you have a disease with a prevalence of 10%, and you're trying to build a predictive model to identify individuals at risk of the disease. A 'model' which predicts a probability of 10% for any individual will have perfect calibration at the population level, but will be absolutely useless at identifying high-risk individuals. You want a model which is well calibrated *and* explains a large amount of the variation in the data. The usual summary statistic for variance explained in linear regression is $R^2 = 1 - RSS_m / RSS_n$, where $RSS_m$ is the residual sum of squares from the model and $RSS_n$ is the residual sum of squares from the null (intercept only) model. The concept of a 'residual' doesn't immediately translate over to GLMs. To see this think about the output from a logistic model - the model can be used to estimate $P(y = 1 \vert X)$ and the data contains observations of $y = 1$ or $y = 0$. The probabilities can be converted into predictions of $y = 1$ by applying a cut-off, saying that any predicted probability greater than some value is a prediction that $y = 1$, but this depends on the choice of cut-off value so isn't a consistent measure. Instead people usually look at *pseudo $R^2$* measures, the most popular one being McFaddens index
+
+$$
+R^2 = 1 - \frac{\ln L_m}{\ln L_n}
+$$
+
+This has roughly the same interpretation as the usual $R^2$ measure, larger values are better and show that the model is explaining a large amount of the variation in the data. We can calculate the pseduo $R^2$ of our model as follows:
+
+```{r}
+m_null = glm(low ~ 1, data = lbw, family = binomial())
+r_sq = 1 - logLik(m) / logLik(m_null)
+r_sq[1]
+```
+
+Alongside calibration, another important feature is the *discrimination* of the model. This is the ability of the model to correctly identify cases ($y = 1$) and non-cases ($y = 0$), and is measured through sensitivity and specificitiy. If we say any individual with a predicted probability $\hat p_i > p$ is classed as a case ($\hat y_i = 1$) then the sensitivity and specificity of the model can be written as 
+
+$$
+\begin{aligned}
+\text{sensitivity} &= P(\hat y_i = 1 | y_i = 1) = \frac{\sum_{i = 1}^n \,[\hat p_i > p,\, y_i = 1]}{\sum_{i = 1}^n \,[y_i = 1]}\\ \\
+\text{specificity} &= P(\hat y_i = 0 | y_i = 0) = \frac{\sum_{i = 1}^n \,[\hat p_i \leq p,\, y_i = 0]}{\sum_{i = 1}^n \,[y_i = 0]}
+\end{aligned}
+$$
+Where the square brackets are indicator variables ($=1$ if the condition inside the brackets is true). These values depend on the cut-off value $p$, and this dependence can be shown in a *ROC plot*. We do it by hand here, but there is the `ROCR` package which does the heavy lifting for you. The `ROCR` package should be used in practice, no need to reinvent the wheel!
+
+```{r}
+cutoff = seq(0, 1, length.out = nrow(lbw))
+sens = vector('double', length(cutoff))
+spec = vector('double', length(cutoff))
+
+for (i in 1:length(cutoff)){
+  c = cutoff[i]
+  sens[i] = sum((lbw$p > c) & (lbw$low == 1)) / sum(lbw$low == 1) 
+  spec[i] = sum((lbw$p <= c) & (lbw$low == 0)) / sum(lbw$low == 0)
+}
+
+df = data.frame(cutoff = cutoff, sens = sens, spec = spec)
+```
+
+```{r, echo = F}
+left = ggplot(df |> tidyr::pivot_longer(-cutoff, names_to = 'type', values_to = 'prob')) +
+  geom_line(aes(x = cutoff, y = prob, colour = type)) +
+  labs(colour = NULL, title = 'Sensitvity & Specificity for\ndifferent cut-off values')
+
+right = ggplot(df) +
+  geom_path(aes(x = 1 - spec, y = sens)) +
+  geom_abline(lty = 2) +
+  labs(title = 'ROC curve\nAUC = 0.7462')
+
+patchwork::wrap_plots(left, right)
+```
+
+One drawback about sensitivity and specificity is that they are conditional on the outcome, which is no help in risk prediction. We want to know the probability of someone getting the disease *before they have the disease*, so we're conditioning on information we don't have. A different option is to construct *predictiveness curves* which sounds very fancy, but it's just the predicted probabilities plotted against its percentiles:
+
+```{r}
+lbw$p_ptile = dplyr::ntile(lbw$p, 100)
+ggplot(lbw, aes(p_ptile, p)) +
+  geom_line()
+```
+
+## Model checks
+
 # Observational data, marginal effects, collapsability
+Observational data is tricky to work with due to *confounding*. People self-select into weight-management programs, people from more deprived areas are more likely to smoke, and people who go to the opera tend to live longer. The self-selection introduces *bias* into the data - the people who voluntarily enter the weight-management program will be different in some way to the general public, so directly comparing these people to the general population will be incorrect. Similarly people in more deprived areas aren't smoking more *because* they live in deprived areas, there will be other social factors which are influencing their decision to smoke. And going to the opera doesn't make you live longer, again there are other factors (e.g. having enough money to go to the opera) which are confounding the association.  
+  These confounding variables need to be controlled for. This introduces two issues - the obvious one is what we don't measure all the confounders? This is called *unmeasured confounding* and is a issue which needs to be addressed in all observational work. The other one is deciding which confounders we should control for. This is often done using a *DAG*, where you draw the assumed causal associations between the variables, then there are rules (something called *do-calculus*) which say what variables need controlling for. The `daggity` package does the do-calculus work for you, and you can draw nice DAGs using `diagrammeR`.
+  
+  Say you fit a model $g(EY|X) = X\beta$ or equivalently $EY|X = g^{-1}(X\beta)$. This is a *conditional model* - it produces predictions for specific values of $X$, i.e. for individuals. This is useful if you're interested in risk prediction for example, where you would take information about a specific individual, calculate a risk score, and then assign a treatment based on that risk score. It's less useful if you're interested in population effects, for example the impact of increasing the smoking age would have on lung cancer prevalence. Suppose there's some variables you're interested in - call them $X$ - and some nuisance parameters $Z$ you want to adjust for. You fit the conditional model as usual to get $E Y| X,Z = g^{-1}(X\beta_1 + Z\beta_2)$, and then take the expectation (marginalise) over the nuisance parameters
+  
+$$
+EY|X = E_Z[EY|X,Z] = \int_Z\,dz\, EY|X,Z\, f_Z(Z)
+$$
+
+This is a marginal model which estimates the prevalence of $Y$ in the population (after adjusting for $X$). Marginal effects are useful for policy decisions.  
+  Your model will estimate $EY|X,Z$, and the empirical distribution $\widehat{f_Z}$ can be estimated from the data, so all these terms are computable. You can do marginalisation by hand or by using the `margins` package
+  
+```{r}
+
+```
 
 # Cohort, case control, and matched studies - logisitic regression part 2
 
